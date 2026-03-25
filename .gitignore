@@ -1,0 +1,48 @@
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual Environments ────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Environment Variables ───────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Database ────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Node.js ─────────────────────────────────────────────────
+node_modules/
+dist/
+.cache/
+
+# ── IDE / Editor ────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── Playwright ──────────────────────────────────────────────
+test-results/
+playwright-report/
