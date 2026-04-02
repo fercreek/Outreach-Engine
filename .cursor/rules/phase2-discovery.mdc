@@ -1,0 +1,126 @@
+---
+description: Guía específica para implementar la Fase 2 — reescribir discovery.py y monitor.py con selectores actuales de TikTok
+globs: ["backend/app/services/discovery.py", "backend/app/services/monitor.py"]
+alwaysApply: false
+---
+
+# Fase 2 — Discovery y Monitor Reales
+
+## Objetivo
+
+Reemplazar los módulos con selectores obsoletos por implementaciones que funcionen con el DOM actual de TikTok. **Antes de escribir cualquier selector, inspeccionar el DOM real en el navegador.**
+
+## discovery.py — flujo a implementar
+
+```
+1. Navegar a TikTok Search: https://www.tiktok.com/search/user?q={hashtag}
+2. Scroll infinito — cargar al menos N perfiles
+3. Por cada perfil en los resultados:
+   a. Extraer username, display name, bio, follower count, profile URL
+   b. Verificar que no está en Blacklist
+   c. Verificar que no existe ya en Lead
+   d. Guardar como Lead(status=discovered)
+4. Log de actividad por cada lead guardado
+5. Emitir progreso al job (leads_processed)
+```
+
+## monitor.py — flujo a implementar
+
+```
+1. Navegar a https://www.tiktok.com/messages
+2. Listar conversaciones visibles
+3. Por cada conversación:
+   a. Extraer username
+   b. Buscar en DB: ¿es un lead con status=dm_sent?
+   c. Si sí: revisar si hay mensajes nuevos no procesados
+   d. Si hay mensaje nuevo: emitir evento reply_received(lead_id, message_text)
+   e. Actualizar lead status=replied
+4. Repetir cada 10 minutos (polling loop con interruptible_sleep)
+```
+
+## Patrón obligatorio para selectores
+
+Siempre definir listas de fallback por elemento. Nunca selector único:
+
+```python
+_PROFILE_CARD_SELECTORS = [
+    '[data-e2e="search-user-card"]',
+    '[data-e2e="user-card"]',
+    'div[class*="UserCard"]',
+    'li[class*="user-item"]',
+]
+
+_USERNAME_SELECTORS = [
+    '[data-e2e="user-unique-id"]',
+    'a[href*="/@"] span',
+    'p[class*="UniqueId"]',
+]
+```
+
+## Extracción robusta de datos
+
+```python
+async def safe_text(element, selectors: list[str]) -> str:
+    """Intenta extraer texto con múltiples selectores, retorna '' si todos fallan."""
+    for sel in selectors:
+        try:
+            loc = element.locator(sel).first
+            if await loc.count() > 0:
+                text = await loc.inner_text()
+                if text.strip():
+                    return text.strip()
+        except Exception:
+            continue
+    return ""
+```
+
+## Parseo de follower count
+
+Los números en TikTok pueden venir como "1.2M", "45.3K", "890":
+
+```python
+def parse_follower_count(text: str) -> int | None:
+    """Convierte '1.2M' → 1200000, '45.3K' → 45300, '890' → 890"""
+    text = text.strip().upper()
+    try:
+        if 'M' in text:
+            return int(float(text.replace('M', '')) * 1_000_000)
+        elif 'K' in text:
+            return int(float(text.replace('K', '')) * 1_000)
+        else:
+            return int(text.replace(',', ''))
+    except (ValueError, AttributeError):
+        return None
+```
+
+## Endpoint a crear en routers/
+
+```python
+# routers/discovery.py
+@router.post("/run")
+async def run_discovery(
+    hashtag: str,
+    limit: int = 50,
+    background_tasks: BackgroundTasks = ...,
+    session: Session = ...,
+):
+    """Dispara un job de discovery en background."""
+    background_tasks.add_task(discover_leads, hashtag, limit)
+    return {"status": "started", "hashtag": hashtag, "limit": limit}
+```
+
+## Anti-detección durante discovery
+
+- Usar `human_pause(2, 5)` entre cada perfil visitado
+- Scroll pausado, no instantáneo — simular lectura
+- No scraping paralelo — secuencial siempre
+- Si TikTok muestra captcha → pausar y log + notificar a Fernando
+
+## Criterios de calificación automática
+
+Un lead pasa de `discovered` a `qualified` si:
+- `follower_count >= 500` (tiene audiencia real)
+- `bio` contiene keywords de niche (academia, gym, estudio, clases, etc.)
+- No está en Blacklist
+
+Leads que no califican → `excluded` con reason `"No califica: {motivo}"`

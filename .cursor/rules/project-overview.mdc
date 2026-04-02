@@ -1,0 +1,47 @@
+---
+description: Arquitectura, fases y reglas del Outreach Engine. Leer siempre antes de cualquier tarea.
+globs: ["**/*.py", "**/*.jsx", "**/*.js"]
+alwaysApply: true
+---
+
+# Outreach Engine — Reglas de Proyecto
+
+## Qué construimos
+
+Sistema de prospección automatizada para atraer dueños de academias/gimnasios hacia **Studio Link**. No es un bot spam — es un pipeline con aprobación humana en cada paso crítico.
+
+**Spec completo:** `specs/orchestrador-spec.md` — leer antes de implementar cualquier feature nuevo.
+
+## Arquitectura en una línea
+
+```
+Discovery → Warming → HITL Approval → DM Send → Reply Detected → Agent Response → Converted
+```
+
+- **Backend:** FastAPI + SQLModel + SQLite + Playwright
+- **Frontend:** React 19 + Vite (CSS variables, sin Tailwind)
+- **Agente (Fase 3):** Claude API `claude-haiku-4-5` con tool use
+
+## Estado de módulos
+
+| Módulo | Estado |
+|--------|--------|
+| `services/worker.py` | ✅ producción |
+| `services/outreach.py` | ✅ producción |
+| `routers/leads.py` (approval queue) | ✅ producción |
+| `frontend/pages/ApprovalQueue.jsx` | ✅ producción |
+| `services/discovery.py` | 🔴 reescribir — selectores obsoletos |
+| `services/monitor.py` | 🔴 reescribir — no funcional |
+| `services/warming.py` | 🟡 revisar selectores |
+| `services/agent.py` | ⬜ Fase 3 — no existe |
+| `services/notifications.py` | ⬜ Fase 3 — no existe |
+| `knowledge/` | ⬜ Fase 3 — no existe |
+
+## Fases de implementación (orden obligatorio)
+
+1. ✅ **Fase 1** — Bugs + HITL
+2. 🔴 **Fase 2** — Discovery y monitor reales (siguiente)
+3. ⬜ **Fase 3** — Response Agent con Claude
+4. ⬜ **Fase 4** — Validación interna 2 semanas
+5. ⬜ **Fase 5** — Instagram
+6. ⬜ **Fase 6** — Multi-tenant para clientes

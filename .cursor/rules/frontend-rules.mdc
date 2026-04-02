@@ -1,0 +1,127 @@
+---
+description: Reglas para el frontend React del Outreach Engine
+globs: ["frontend/src/**/*.jsx", "frontend/src/**/*.js"]
+alwaysApply: false
+---
+
+# Frontend Rules — Outreach Engine
+
+## Stack
+
+- React 19 + Vite + React Router v6
+- CSS variables (ver `index.css`) — **sin Tailwind**
+- Sin TypeScript — archivos `.jsx` y `.js`
+- API calls centralizadas en `api/client.js`
+
+## Variables CSS disponibles
+
+```css
+/* Backgrounds */
+--bg-base, --bg-surface, --bg-elevated
+
+/* Text */
+--text-primary, --text-secondary, --text-muted
+
+/* Accent */
+--accent (azul principal)
+
+/* Status */
+--success, --warning, --error
+
+/* Layout */
+--radius-sm, --radius-md, --radius-lg
+--border-subtle
+```
+
+## Patrones de página
+
+Todas las páginas siguen la misma estructura:
+
+```jsx
+export default function MyPage() {
+  const toast = useToast();
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  async function fetchData() {
+    try {
+      const result = await apiCall();
+      setData(result);
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { fetchData(); }, []);
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h2>🔖 Título</h2>
+          <p className="page-header-subtitle">Descripción</p>
+        </div>
+        {/* acciones del header a la derecha */}
+      </div>
+
+      <div className="card">
+        {/* contenido */}
+      </div>
+    </div>
+  );
+}
+```
+
+## Clases CSS del sistema
+
+```
+.card              — contenedor con fondo, sombra, border-radius
+.page-header       — flex row, space-between, con título a la izquierda y acciones a la derecha
+.page-header-subtitle — texto gris debajo del h2
+.btn               — botón base (gris neutro)
+.btn.btn-play      — botón primario (azul/verde)
+.btn.btn-danger    — botón destructivo (rojo)
+.data-table        — tabla con bordes y hover
+.nav-link          — item del sidebar
+.nav-link.active   — item activo
+```
+
+## Añadir una nueva página
+
+1. Crear `frontend/src/pages/MiPagina.jsx`
+2. Añadir ruta en `App.jsx`
+3. Añadir item en `Sidebar.jsx` → array `navItems`
+4. Añadir función API en `api/client.js` si hay nuevos endpoints
+
+## API client
+
+Todas las llamadas al backend van por `api/client.js`. Nunca usar `fetch()` directamente en las páginas.
+
+```js
+// Añadir en client.js
+export const miFuncion = (params) => request('/ruta', { method: 'POST', body: JSON.stringify(params) });
+```
+
+## Notificaciones (Toast)
+
+```jsx
+const toast = useToast();
+toast('Mensaje de éxito', 'success');
+toast('Error al procesar', 'error');
+toast('Información', 'info');
+```
+
+## Páginas existentes
+
+| Ruta | Archivo | Estado |
+|------|---------|--------|
+| `/` | `Dashboard.jsx` | ✅ |
+| `/leads` | `LeadCenter.jsx` | ✅ |
+| `/approval` | `ApprovalQueue.jsx` | ✅ |
+| `/templates` | `Templates.jsx` | ✅ |
+| `/dispatch` | `Dispatch.jsx` | ✅ |
+| `/logs` | `ActivityLog.jsx` | ✅ |
+| `/blacklist` | `BlacklistPage.jsx` | ✅ |
+| `/conversations` | `Conversations.jsx` | ⬜ Fase 3 |

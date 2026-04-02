@@ -1,0 +1,174 @@
+---
+description: Guía para implementar la Fase 3 — Response Agent con Claude API y knowledge base de Studio Link
+globs: ["backend/app/services/agent.py", "backend/app/knowledge/**", "backend/app/routers/agent.py"]
+alwaysApply: false
+---
+
+# Fase 3 — Response Agent
+
+## Objetivo
+
+Cuando un prospecto responde a nuestro DM, el agente toma la conversación, entiende el negocio del lead, y lo guía hacia el trial de Studio Link. El agente responde como el equipo de Studio Link — nunca se identifica como IA.
+
+## Modelo a usar
+
+`claude-haiku-4-5` — rápido, económico, suficiente para DMs cortos.
+NO usar Sonnet/Opus para esto — sería 10x más caro sin ganancia real.
+
+## Arquitectura del agente
+
+```python
+# services/agent.py
+
+async def process_reply(lead_id: int, reply_text: str) -> str:
+    """
+    Recibe la respuesta de un lead y devuelve el mensaje que el sistema enviará.
+    Guarda el historial en DB y ejecuta las tools necesarias.
+    """
+    lead = get_lead(lead_id)
+    history = get_conversation_history(lead_id)
+    knowledge = load_knowledge_base()
+
+    response = await claude_client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=500,
+        system=build_system_prompt(lead, knowledge),
+        messages=history + [{"role": "user", "content": reply_text}],
+        tools=AGENT_TOOLS,
+    )
+
+    # Procesar tool calls si las hay
+    # Guardar en ConversationMessage
+    # Retornar texto a enviar por DM
+```
+
+## System prompt — estructura
+
+```
+Eres parte del equipo de Studio Link, un software para academias y gimnasios en México.
+
+Tu objetivo: entender si este negocio puede beneficiarse de Studio Link y, si es así, invitarlos a probar el trial gratuito de 14 días.
+
+Contexto del lead:
+- Usuario: @{username}
+- Negocio: {business_name}
+- Nicho: {niche}
+- Bio: {bio}
+- Seguidores: {follower_count}
+
+Producto:
+{knowledge_base_content}
+
+Reglas de conversación:
+- Primero pregunta sobre su negocio, no vendas de inmediato
+- Si preguntan precio, explica los planes y da el link
+- Si dicen "me interesa" o "cómo me registro" → da el link directo
+- Si rechazan claramente → usa mark_excluded(), no insistas
+- Si la pregunta está fuera de tu conocimiento → usa escalate_to_human()
+- Respuestas cortas: máximo 3 oraciones, tono casual como WhatsApp
+- NUNCA digas que eres IA
+```
+
+## Tools del agente
+
+```python
+AGENT_TOOLS = [
+    {
+        "name": "send_reply",
+        "description": "Envía un mensaje de respuesta al lead por DM. Úsala cuando tengas la respuesta lista.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "message": {"type": "string", "description": "Mensaje a enviar"}
+            },
+            "required": ["message"]
+        }
+    },
+    {
+        "name": "mark_converted",
+        "description": "Marca el lead como convertido cuando acepta registrarse o dar sus datos.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "notes": {"type": "string", "description": "Resumen de por qué se convirtió"}
+            },
+            "required": ["notes"]
+        }
+    },
+    {
+        "name": "mark_excluded",
+        "description": "Marca el lead como excluido cuando rechaza claramente o no es el perfil correcto.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reason": {"type": "string"}
+            },
+            "required": ["reason"]
+        }
+    },
+    {
+        "name": "escalate_to_human",
+        "description": "Notifica a Fernando vía WhatsApp cuando el lead tiene una pregunta que el agente no puede responder, o cuando está muy caliente y merece atención personal.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "reason": {"type": "string", "description": "Por qué se escala"}
+            },
+            "required": ["reason"]
+        }
+    }
+]
+```
+
+## Knowledge base — archivos a crear
+
+```
+backend/app/knowledge/
+├── studio-link-overview.md     — qué hace el producto, para quién es
+├── plans-pricing.md            — planes Essential/Scale/Enterprise, precios MXN, diferencias
+├── faq.md                      — objeciones comunes ("ya uso Excel", "es muy caro", "cómo funciona")
+└── trial-signup.md             — link de registro, qué incluye el trial, cómo configurarlo
+```
+
+Estos archivos los edita Fernando directamente — sin código.
+
+## Modelo de DB a crear
+
+```python
+class ConversationMessage(SQLModel, table=True):
+    __tablename__ = "conversation_messages"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    lead_id: int = Field(foreign_key="leads.id", index=True)
+    role: str = Field(max_length=20)       # "user" | "assistant"
+    content: str = Field(max_length=2000)
+    platform: str = Field(default="tiktok", max_length=20)
+    created_at: datetime = Field(default_factory=_now)
+```
+
+## Endpoint a crear
+
+```python
+# routers/agent.py
+@router.post("/process-reply")
+async def process_reply(
+    lead_id: int,
+    reply_text: str,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Recibe evento reply_received del monitor y dispara el agente.
+    El agente responde en background para no bloquear el polling del monitor.
+    """
+    background_tasks.add_task(agent_service.process_reply, lead_id, reply_text)
+    return {"status": "processing", "lead_id": lead_id}
+```
+
+## UI a crear — Conversations.jsx
+
+Vista de todas las conversaciones activas:
+- Lista de leads con `status=replied` o `status=dm_sent` con actividad reciente
+- Por cada conversación: historial de mensajes (tipo WhatsApp)
+- Badge "Agente" / "Human" por mensaje
+- Botón "Tomar control" — pausa el agente y permite responder manualmente
+- Botón "Marcar convertido" / "Excluir"

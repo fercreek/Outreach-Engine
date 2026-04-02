@@ -1,0 +1,113 @@
+---
+description: Reglas para código Python/FastAPI del backend del Outreach Engine
+globs: ["backend/**/*.py"]
+alwaysApply: false
+---
+
+# Backend Rules — Outreach Engine
+
+## Anti-ban: reglas irrompibles
+
+- `headless: False` siempre — nunca cambiar a `True` en producción
+- Delay mínimo entre DMs: 900 segundos (15 min) — no bajar por ningún motivo
+- Cap diario: 45 DMs — enforcearlo en el worker antes de cada envío
+- Todo lead pasa por la cola de aprobación antes del DM — nunca saltar este paso
+
+## Playwright — selectores resilientes
+
+Siempre usar listas de fallback, nunca un solo selector:
+
+```python
+# ❌ Mal — selector único, se rompe con cualquier deploy de TikTok
+btn = page.locator('button:has-text("New message")')
+
+# ✅ Bien — lista de fallbacks, _first_visible() toma el primero que funcione
+SELECTORS = [
+    '[data-e2e="new-message-btn"]',
+    'button[aria-label*="new message" i]',
+    'button:has-text("New message")',
+]
+btn = await _first_visible(page, SELECTORS)
+```
+
+`_first_visible()` está definida en `services/outreach.py` — importar o replicar el patrón.
+
+## Bugs conocidos — no reintroducir
+
+```python
+# ❌ personalize() espera dict, no objeto Lead
+personalize(raw_content, lead)
+
+# ✅ Correcto
+personalize(raw_content, lead.model_dump())
+
+# ❌ LeadStatus.interaction_failed no existe
+update_lead_status(lead.id, LeadStatus.interaction_failed)
+
+# ✅ Correcto
+update_lead_status(lead.id, LeadStatus.excluded)
+
+# ❌ settings usa snake_case (pydantic_settings)
+settings.MIN_DELAY_BETWEEN_DMS_SEC
+
+# ✅ Correcto
+settings.min_delay_between_dms_sec
+
+# ❌ send_dm() retorna dict, no bool
+if success:  # always True para cualquier dict no vacío
+
+# ✅ Correcto
+result = await send_dm(page, lead, message)
+if result["success"]:
+```
+
+## LeadStatus — estados válidos
+
+```python
+discovered → qualified → warming → dm_pending → dm_sent → replied → converted
+                                 ↘ interacted                     ↘ excluded
+```
+
+Solo estos: `discovered, qualified, warming, interacted, dm_pending, dm_sent, replied, converted, excluded`
+
+## Delays interruptibles
+
+Nunca usar `asyncio.sleep()` directo para delays largos (>30s). Usar `interruptible_sleep()`:
+
+```python
+# ❌ Bloquea el job por 15 min, ignora pause/cancel
+await asyncio.sleep(settings.min_delay_between_dms_sec)
+
+# ✅ Chequea el estado cada 30s, responde a pause/cancel
+await interruptible_sleep(job_id, settings.min_delay_between_dms_sec)
+```
+
+## Routing — orden en FastAPI
+
+Rutas específicas ANTES que rutas con path params del mismo tipo:
+
+```python
+# Si lead_id es int, FastAPI no confunde /approval-queue con /{lead_id}
+# Pero si hay duda, definir la ruta específica primero
+@router.get("/approval-queue")   # primero
+@router.get("/{lead_id}")        # después
+```
+
+## Services — separación de responsabilidades
+
+- `worker.py` — orquesta el flujo, no tiene lógica de UI
+- `outreach.py` — solo envío de DMs, no sabe de jobs
+- `discovery.py` — solo scraping, guarda leads en DB
+- `monitor.py` — solo detección de respuestas, emite eventos
+- `agent.py` (Fase 3) — solo conversación con Claude, no sabe de Playwright
+- Routers — solo HTTP, delegan a services
+
+## Logging
+
+Usar `log_activity_external()` para registrar eventos desde services:
+
+```python
+log_activity_external(job_id, lead.id, "info", "mensaje descriptivo", ActionType.profile_visited)
+```
+
+No usar `print()` — usar `logger = logging.getLogger(__name__)`.

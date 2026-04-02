@@ -1,0 +1,32 @@
+---
+description: UI interna del Engine — tema oscuro y tokens propios; no mezclar con marketing kit
+globs: ["frontend/src/**/*.jsx", "frontend/src/**/*.js", "frontend/src/**/*.css"]
+alwaysApply: false
+---
+
+# UI — outreach-engine (frontend)
+
+## Rol
+
+Panel interno de prospección (React + Vite). **Tema oscuro** con acento violeta — es la identidad de esta app, no la de landings de Agencia Cero.
+
+## Fuente de verdad
+
+- `frontend/src/index.css`: `:root` con `--bg-primary`, `--accent` (#8b5cf6), `--text-primary`, `.card`, `.page-header`, etc.
+- Reglas detalladas: `frontend-rules.mdc` (mismo directorio).
+
+## Consistencia interna
+
+- Nuevas pantallas: reutilizar `.card`, `.page-header`, variables CSS existentes; no añadir Tailwind.
+- No copiar estilos de `cero-content/public/*.html` (kit claro) ni de `studio-link` (Tailwind app).
+
+## Relación con otros repos
+
+| Origen | Uso |
+|--------|-----|
+| Marketing kit claro | Solo referencia para copy/microcopy; **no** para colores de este frontend |
+| Studio Link Rails | Producto destino del outreach; sin componentes compartidos en código |
+
+## API y copy
+
+Textos de UI en español coherente con el tono del panel (directo, operativo). No mezclar branding Studio Link (sl_*) aquí.
