@@ -74,5 +74,5 @@ def delete_template(template_id: int, session: Session = Depends(get_session)):
 @router.post("/preview")
 def preview_spintax(data: SpintaxPreview):
     """Generate N variations of a spintax template."""
-    variations = spin_multiple(data.template_text, data.count)
+    variations = spin_multiple(data.content, data.count)
     return {"variations": variations, "count": len(variations)}

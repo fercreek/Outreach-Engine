@@ -13,7 +13,8 @@ engine = create_engine(
 
 
 def create_db_and_tables() -> None:
-    """Create all tables defined by SQLModel metadata."""
+    from app.models import ConversationMessage  # noqa: F401
+
     SQLModel.metadata.create_all(engine)
 
 

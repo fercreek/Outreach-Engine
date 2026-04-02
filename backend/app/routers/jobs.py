@@ -3,12 +3,13 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models import BatchJob, JobStatus, Lead, LeadStatus
 from app.schemas import BatchJobCreate, BatchJobRead
+from app.services.worker import execute_job
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -73,7 +74,11 @@ def create_job(data: BatchJobCreate, session: Session = Depends(get_session)):
 
 
 @router.post("/{job_id}/start", response_model=BatchJobRead)
-def start_job(job_id: int, session: Session = Depends(get_session)):
+def start_job(
+    job_id: int, 
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session)
+):
     job = session.get(BatchJob, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -85,7 +90,10 @@ def start_job(job_id: int, session: Session = Depends(get_session)):
     session.add(job)
     session.commit()
     session.refresh(job)
-    # TODO: trigger background automation task
+
+    # Trigger background worker
+    background_tasks.add_task(execute_job, job.id)
+    
     return job
 
 

@@ -10,11 +10,10 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # ── Database ─────────────────────────────────────────────
-    database_url: str = "sqlite:///./studiolink.db"
+    database_url: str = "sqlite:///./studiolink_v2.db"
 
-    # ── Browser / Playwright ─────────────────────────────────
     chrome_profile_path: str = str(
-        Path.home() / "Library/Application Support/Google/Chrome/Default"
+        Path.home() / ".outreach-engine/profile-v2"
     )
     headless: bool = False  # NEVER headless in production
 
@@ -31,6 +30,17 @@ class Settings(BaseSettings):
 
     # ── CORS ─────────────────────────────────────────────────
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-3-5-haiku-20241022"
+
+    twilio_account_sid: str | None = None
+    twilio_auth_token: str | None = None
+    twilio_whatsapp_from: str | None = None
+    escalation_whatsapp_to: str | None = None
+
+    agent_auto_on_reply: bool = True
+    trial_signup_url: str | None = None
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

@@ -3,12 +3,13 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlmodel import Session, select, func, col
 
 from app.database import get_session
-from app.models import Lead, LeadStatus, Niche, ActivityLog, ActionType, Blacklist
+from app.models import Lead, LeadStatus, Niche, ActivityLog, ActionType, Blacklist, MessageTemplate
 from app.schemas import LeadCreate, LeadUpdate, LeadRead, LeadBulkImport
+from app.services.spintax import spin, personalize
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
@@ -83,7 +84,12 @@ def create_lead(data: LeadCreate, session: Session = Depends(get_session)):
     session.refresh(lead)
 
     # Log discovery
-    log = ActivityLog(lead_id=lead.id, action_type=ActionType.discovered, details=f"Lead @{lead.username} added")
+    log = ActivityLog(
+        lead_id=lead.id, 
+        action_type=ActionType.discovered, 
+        level="info",
+        message=f"Lead @{lead.username} añadido manualmente"
+    )
     session.add(log)
     session.commit()
 
@@ -114,7 +120,12 @@ def bulk_import(data: LeadBulkImport, session: Session = Depends(get_session)):
             session.commit()
             session.refresh(lead)
 
-            log = ActivityLog(lead_id=lead.id, action_type=ActionType.discovered)
+            log = ActivityLog(
+                lead_id=lead.id, 
+                action_type=ActionType.discovered,
+                level="info",
+                message=f"Lead @{lead.username} importado en lote"
+            )
             session.add(log)
             session.commit()
             created += 1
@@ -174,10 +185,109 @@ def transition_status(
     log = ActivityLog(
         lead_id=lead.id,
         action_type=ActionType.qualified,
-        details=f"Status: {old_status} → {new_status}",
+        level="info",
+        message=f"Estatus: {old_status} → {new_status}",
     )
     session.add(log)
     session.commit()
     session.refresh(lead)
 
     return {"id": lead.id, "old_status": old_status, "new_status": new_status}
+
+
+# ── Approval Queue (Human-in-the-loop) ────────────────────────
+
+@router.get("/approval-queue", response_model=list[dict])
+def approval_queue(session: Session = Depends(get_session)):
+    """
+    Return all leads in 'qualified' or 'warming' status that are ready for DM review.
+    Each entry includes a preview of the message that will be sent.
+    """
+    template = session.exec(select(MessageTemplate).where(MessageTemplate.is_active == True)).first()
+
+    leads = session.exec(
+        select(Lead).where(Lead.status.in_([LeadStatus.qualified, LeadStatus.warming]))
+        .order_by(Lead.updated_at.desc())  # type: ignore[union-attr]
+    ).all()
+
+    result = []
+    for lead in leads:
+        preview = ""
+        if template:
+            raw = spin(template.content)
+            preview = personalize(raw, lead.model_dump())
+        result.append({
+            "id": lead.id,
+            "username": lead.username,
+            "business_name": lead.business_name,
+            "profile_url": lead.profile_url,
+            "niche": lead.niche,
+            "follower_count": lead.follower_count,
+            "bio": lead.bio,
+            "status": lead.status,
+            "message_preview": preview,
+            "updated_at": lead.updated_at,
+        })
+    return result
+
+
+@router.post("/approval-queue/approve")
+def approve_leads(
+    lead_ids: list[int] = Body(..., embed=True),
+    session: Session = Depends(get_session),
+):
+    """
+    Bulk-approve leads for DM dispatch: transitions them from qualified/warming → dm_pending.
+    The worker will pick them up on the next job run.
+    """
+    approved = []
+    for lead_id in lead_ids:
+        lead = session.get(Lead, lead_id)
+        if not lead:
+            continue
+        if lead.status not in (LeadStatus.qualified, LeadStatus.warming):
+            continue
+        lead.status = LeadStatus.dm_pending
+        lead.updated_at = datetime.now(timezone.utc)
+        session.add(lead)
+        log = ActivityLog(
+            lead_id=lead.id,
+            action_type=ActionType.qualified,
+            level="info",
+            message="Lead aprobado para DM por operador",
+        )
+        session.add(log)
+        approved.append(lead_id)
+
+    session.commit()
+    return {"approved": approved, "count": len(approved)}
+
+
+@router.post("/approval-queue/reject")
+def reject_leads(
+    lead_ids: list[int] = Body(..., embed=True),
+    reason: Optional[str] = Body(default="Rechazado por operador"),
+    session: Session = Depends(get_session),
+):
+    """
+    Bulk-reject leads: transitions them to 'excluded' so they won't be processed again.
+    """
+    rejected = []
+    for lead_id in lead_ids:
+        lead = session.get(Lead, lead_id)
+        if not lead:
+            continue
+        lead.status = LeadStatus.excluded
+        lead.updated_at = datetime.now(timezone.utc)
+        session.add(lead)
+        log = ActivityLog(
+            lead_id=lead.id,
+            action_type=ActionType.excluded,
+            level="info",
+            message=f"Lead excluido: {reason}",
+        )
+        session.add(log)
+        rejected.append(lead_id)
+
+    session.commit()
+    return {"rejected": rejected, "count": len(rejected)}

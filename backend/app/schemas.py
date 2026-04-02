@@ -56,14 +56,14 @@ class LeadBulkImport(BaseModel):
 class TemplateCreate(BaseModel):
     name: str = Field(max_length=120)
     niche: Optional[Niche] = None
-    template_text: str
+    content: str
     spintax_enabled: bool = True
 
 
 class TemplateUpdate(BaseModel):
     name: Optional[str] = None
     niche: Optional[Niche] = None
-    template_text: Optional[str] = None
+    content: Optional[str] = None
     spintax_enabled: Optional[bool] = None
     is_active: Optional[bool] = None
 
@@ -72,7 +72,7 @@ class TemplateRead(BaseModel):
     id: int
     name: str
     niche: Optional[Niche]
-    template_text: str
+    content: str
     spintax_enabled: bool
     is_active: bool
     created_at: datetime
@@ -80,7 +80,7 @@ class TemplateRead(BaseModel):
 
 
 class SpintaxPreview(BaseModel):
-    template_text: str
+    content: str
     count: int = Field(default=5, ge=1, le=20)
 
 
@@ -102,9 +102,11 @@ class BlacklistRead(BaseModel):
 
 class ActivityLogRead(BaseModel):
     id: int
+    job_id: Optional[int]
     lead_id: Optional[int]
     action_type: ActionType
-    details: Optional[str]
+    level: str
+    message: str
     created_at: datetime
 
 
@@ -120,8 +122,8 @@ class BatchJobRead(BaseModel):
     status: JobStatus
     job_type: str
     total_leads: int
-    processed: int
-    failed: int
+    leads_processed: int
+    leads_failed: int
     started_at: Optional[datetime]
     finished_at: Optional[datetime]
     created_at: datetime
@@ -136,3 +138,24 @@ class DashboardStats(BaseModel):
     dms_sent_today: int
     replies_today: int
     active_job: Optional[BatchJobRead] = None
+
+
+class ConversationMessageRead(BaseModel):
+    id: int
+    lead_id: int
+    role: str
+    content: str
+    created_at: datetime
+
+
+class ConversationLeadSummary(BaseModel):
+    lead_id: int
+    username: str
+    business_name: Optional[str]
+    status: LeadStatus
+    last_message_at: datetime
+
+
+class ProcessReplyBody(BaseModel):
+    lead_id: int = Field(ge=1)
+    message_text: Optional[str] = Field(default=None, max_length=8000)

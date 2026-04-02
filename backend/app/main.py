@@ -7,13 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import create_db_and_tables
-from app.routers import leads, templates, blacklist, logs, jobs, dashboard
+from app.routers import leads, templates, blacklist, logs, jobs, dashboard, discovery, agent
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     # ── Startup ──
+    print("🚀 StudioLink Outreach Engine Backend Starting...")
+    print("✅ CORS Enabled for all origins")
     create_db_and_tables()
     _seed_default_templates()
     yield
@@ -22,16 +24,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title=settings.app_name,
-    version="0.1.0",
-    description="Automated TikTok cold outreach for StudioLink 🚀",
+    title="StudioLink Outreach Engine",
+    description="TikTok CRM & Automation platform for dance academies",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
-# ── CORS ─────────────────────────────────────────────────────
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=["*"],  # For dev; restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,6 +46,8 @@ app.include_router(templates.router, prefix="/api")
 app.include_router(blacklist.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
+app.include_router(discovery.router, prefix="/api")
+app.include_router(agent.router, prefix="/api")
 
 
 @app.get("/api/health")
@@ -68,7 +72,7 @@ def _seed_default_templates():
             MessageTemplate(
                 name="Copy Maestro — Danza",
                 niche=Niche.danza,
-                template_text=(
+                content=(
                     "¡{Hola|Hey|Qué tal}! Como programador y bailarín 🕺 "
                     "{uso|utilizo} tecnología para automatizar el lado "
                     "{aburrido|tedioso|repetitivo} de {dar clases|administrar una academia}: "
@@ -82,7 +86,7 @@ def _seed_default_templates():
             MessageTemplate(
                 name="Copy Maestro — Deportes",
                 niche=Niche.futbol,
-                template_text=(
+                content=(
                     "¡{Hola|Hey|Qué tal}! Soy programador y {también amo el deporte|me apasiona el deporte} ⚽ "
                     "{Creé|Desarrollé} una plataforma para automatizar "
                     "{cobros|pagos}, {inscripciones|reservas} y seguimiento de alumnos "
@@ -94,7 +98,7 @@ def _seed_default_templates():
             MessageTemplate(
                 name="Copy Maestro — General",
                 niche=None,
-                template_text=(
+                content=(
                     "¡{Hola|Hey|Qué tal}! Soy programador y {bailarín|deportista} 🕺 "
                     "{Automatizo|Simplifico} el lado {administrativo|operativo} de "
                     "{academias|escuelas|centros de entrenamiento}: "

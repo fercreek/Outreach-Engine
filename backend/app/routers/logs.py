@@ -60,9 +60,11 @@ async def stream_logs():
                         "event": "log",
                         "data": json.dumps({
                             "id": log.id,
+                            "job_id": log.job_id,
                             "lead_id": log.lead_id,
                             "action_type": log.action_type.value,
-                            "details": log.details,
+                            "level": log.level,
+                            "message": log.message,
                             "created_at": log.created_at.isoformat(),
                         }),
                     }

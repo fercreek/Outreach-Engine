@@ -5,15 +5,17 @@ import random
 
 from playwright.async_api import Page
 
-from app.services.browser import get_browser_page
+from app.services.browser import BrowserManager
+from app.services.outreach import detect_tiktok_challenge
 from app.utils.jitter import human_pause
+from app.models import Lead
 
 logger = logging.getLogger(__name__)
 
 TIKTOK_BASE = "https://www.tiktok.com"
 
 
-async def warm_profile(username: str) -> dict:
+async def warm_lead(page: Page, lead: Lead) -> dict:
     """
     Execute the warming sequence for a lead:
     1. Visit their profile
@@ -23,14 +25,24 @@ async def warm_profile(username: str) -> dict:
 
     This generates a friendly notification before the DM.
     """
-    page = await get_browser_page()
+    username = lead.username
     url = f"{TIKTOK_BASE}/@{username}"
-    result = {"username": username, "visited": False, "videos_watched": 0, "liked": False}
+    result = {
+        "username": username,
+        "visited": False,
+        "videos_watched": 0,
+        "liked": False,
+        "challenge_detected": False,
+    }
 
     try:
         # ── Step 1: Visit Profile ────────────────────────────
         await page.goto(url, wait_until="networkidle", timeout=30000)
         await human_pause(3, 7)  # Linger on profile like a real person
+        if await detect_tiktok_challenge(page):
+            result["challenge_detected"] = True
+            logger.warning(f"⛔ Challenge/CAPTCHA en perfil @{username} — warming detenido")
+            return result
         result["visited"] = True
         logger.info(f"👁️ Visited @{username}'s profile")
 

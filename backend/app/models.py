@@ -42,6 +42,8 @@ class ActionType(str, Enum):
     reply_detected = "reply_detected"
     excluded = "excluded"
     error = "error"
+    agent_reply = "agent_reply"
+    escalation = "escalation"
 
 
 class JobStatus(str, Enum):
@@ -83,7 +85,7 @@ class MessageTemplate(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(max_length=120)
     niche: Optional[Niche] = Field(default=None, index=True)
-    template_text: str
+    content: str = Field(alias="template_text") # Keep compatibility if needed, but 'content' is better
     spintax_enabled: bool = Field(default=True)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=_now)
@@ -94,9 +96,11 @@ class ActivityLog(SQLModel, table=True):
     __tablename__ = "activity_logs"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    job_id: Optional[int] = Field(default=None, foreign_key="batch_jobs.id", index=True)
     lead_id: Optional[int] = Field(default=None, foreign_key="leads.id", index=True)
-    action_type: ActionType
-    details: Optional[str] = Field(default=None)
+    action_type: ActionType = Field(default=ActionType.discovered)
+    level: str = Field(default="info", max_length=20) # info, success, warning, error
+    message: str = Field(max_length=500)
     created_at: datetime = Field(default_factory=_now)
 
 
@@ -116,9 +120,19 @@ class BatchJob(SQLModel, table=True):
     status: JobStatus = Field(default=JobStatus.pending)
     job_type: str = Field(default="outreach", max_length=50)  # outreach | discovery | warming
     total_leads: int = Field(default=0)
-    processed: int = Field(default=0)
-    failed: int = Field(default=0)
+    leads_processed: int = Field(default=0)
+    leads_failed: int = Field(default=0)
     config_json: Optional[str] = Field(default=None)   # JSON blob for job-specific settings
     started_at: Optional[datetime] = Field(default=None)
     finished_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=_now)
+
+
+class ConversationMessage(SQLModel, table=True):
+    __tablename__ = "conversation_messages"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    lead_id: int = Field(foreign_key="leads.id", index=True)
+    role: str = Field(max_length=20)
+    content: str = Field(max_length=10000)
     created_at: datetime = Field(default_factory=_now)

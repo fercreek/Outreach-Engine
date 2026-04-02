@@ -37,25 +37,26 @@ class BrowserManager:
 
         self._playwright = await async_playwright().start()
 
-        # Use persistent context for cookie/session persistence
         user_data_dir = Path(settings.chrome_profile_path).parent
-        self._context = await self._playwright.chromium.launch_persistent_context(
-            user_data_dir=str(user_data_dir),
-            headless=settings.headless,
-            viewport={"width": 1280, "height": 900},
-            locale="es-MX",
-            timezone_id="America/Monterrey",
-            user_agent=(
+        launch_kw: dict = {
+            "user_data_dir": str(user_data_dir),
+            "headless": settings.headless,
+            "ignore_default_args": ["--enable-automation"],
+            "viewport": {"width": 1280, "height": 900},
+            "locale": "es-MX",
+            "timezone_id": "America/Monterrey",
+            "user_agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/131.0.0.0 Safari/537.36"
             ),
-            args=[
+            "args": [
                 "--disable-blink-features=AutomationControlled",
                 "--disable-infobars",
                 "--no-first-run",
             ],
-        )
+        }
+        self._context = await self._playwright.chromium.launch_persistent_context(**launch_kw)
 
         # Apply stealth tweaks
         await self._apply_stealth(self._context)
