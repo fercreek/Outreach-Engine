@@ -43,6 +43,8 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+backend/test_ig_results.json
+
 # ── Playwright ──────────────────────────────────────────────
 test-results/
 playwright-report/
