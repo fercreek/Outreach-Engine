@@ -56,6 +56,8 @@ export default function ActivityLog() {
     reply_detected: '💬',
     excluded: '⛔',
     error: '❌',
+    agent_reply: '🤖',
+    escalation: '📣',
   };
 
   function formatTime(isoString) {
@@ -104,12 +106,13 @@ export default function ActivityLog() {
             </div>
           ) : (
             logs.map((log) => (
-              <div key={log.id} className="log-entry">
+              <div key={log.id} className={`log-entry ${log.level}`}>
                 <span className="log-time">{formatTime(log.created_at)}</span>
                 <span className={`log-action ${log.action_type}`}>
                   {actionEmojis[log.action_type] || '📌'} {log.action_type}
                 </span>
-                <span className="log-details">{log.details || ''}</span>
+                {log.job_id && <span className="log-job-badge">#{log.job_id}</span>}
+                <span className="log-message">{log.message}</span>
               </div>
             ))
           )}

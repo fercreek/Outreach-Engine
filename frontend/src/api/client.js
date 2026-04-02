@@ -78,8 +78,27 @@ export const getJobs = (params = {}) => {
   return request(`/jobs/?${qs}`);
 };
 
+// ── Approval Queue ──────────────────────────────────────────
+export const getApprovalQueue = () => request('/leads/approval-queue');
+export const approveLeads = (leadIds) =>
+  request('/leads/approval-queue/approve', { method: 'POST', body: JSON.stringify({ lead_ids: leadIds }) });
+export const rejectLeads = (leadIds, reason) =>
+  request('/leads/approval-queue/reject', {
+    method: 'POST',
+    body: JSON.stringify({ lead_ids: leadIds, reason: reason || 'Rechazado por operador' }),
+  });
+
 export const getActiveJob = () => request('/jobs/active');
 export const createJob = (data = {}) => request('/jobs/', { method: 'POST', body: JSON.stringify(data) });
 export const startJob = (id) => request(`/jobs/${id}/start`, { method: 'POST' });
 export const pauseJob = (id) => request(`/jobs/${id}/pause`, { method: 'POST' });
 export const cancelJob = (id) => request(`/jobs/${id}/cancel`, { method: 'POST' });
+
+export const getConversationLeads = () => request('/agent/conversations');
+export const getConversationMessages = (leadId) =>
+  request(`/agent/conversations/${leadId}/messages`);
+export const processAgentReply = (leadId, messageText) =>
+  request('/agent/process-reply', {
+    method: 'POST',
+    body: JSON.stringify({ lead_id: leadId, message_text: messageText || null }),
+  });

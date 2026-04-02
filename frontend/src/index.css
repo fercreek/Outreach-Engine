@@ -659,8 +659,22 @@ a:hover { color: var(--accent); }
 .log-action.reply_detected { color: var(--status-replied); }
 .log-action.error { color: var(--error); }
 
-.log-details {
+.log-details, .log-message {
   color: var(--text-secondary);
+}
+
+.log-entry.success .log-message { color: var(--success); }
+.log-entry.warning .log-message { color: var(--warning); }
+.log-entry.error .log-message { color: var(--error); }
+
+.log-job-badge {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  padding: 0 0.4rem;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 
 /* ── Template Editor ────────────────────────────────────────── */

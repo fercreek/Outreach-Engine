@@ -7,6 +7,8 @@ import Templates from './pages/Templates';
 import Dispatch from './pages/Dispatch';
 import ActivityLog from './pages/ActivityLog';
 import BlacklistPage from './pages/BlacklistPage';
+import ApprovalQueue from './pages/ApprovalQueue';
+import Conversations from './pages/Conversations';
 
 export default function App() {
   return (
@@ -18,6 +20,8 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/leads" element={<LeadCenter />} />
+              <Route path="/approval" element={<ApprovalQueue />} />
+              <Route path="/conversations" element={<Conversations />} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/dispatch" element={<Dispatch />} />
               <Route path="/logs" element={<ActivityLog />} />
