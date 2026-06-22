@@ -150,6 +150,14 @@ async def preflight_dm_instagram(page: Page, lead: Lead, message: str) -> dict:
             return result
         await msg_btn.click()
         await human_pause(1.5, 3)
+        try:
+            await page.wait_for_selector(
+                'div[contenteditable="true"][role="textbox"]',
+                state="visible",
+                timeout=8_000,
+            )
+        except Exception:
+            pass
         textbox = await _first_visible(page, _TEXTBOX_SELECTORS)
         if not textbox:
             result["error"] = "Panel DM no abrió — sin textbox"
@@ -216,18 +224,50 @@ async def send_dm_instagram(page: Page, lead: Lead, message: str) -> dict:
         await page.evaluate("window.scrollBy(0, -100)")
         await human_pause(0.5, 1.5)
 
-        # ── 3. Click Message button ───────────────────────────
-        msg_btn = await _first_visible(page, _MSG_BUTTON_SELECTORS)
-        if not msg_btn:
-            result["error"] = f"'Message' button not found on @{username} — account may be private or require follow"
-            logger.warning(f"⚠️ {result['error']}")
-            return result
+        # ── 3. Click Message button → open DM panel (retry on panel-fail) ──────
+        # "Message" clickea pero el textbox no aparece = throttle/timing de IG
+        # (no que la cuenta sea inalcanzable). Reintenta 1 vez con backoff +
+        # reload antes de rendirse, para no desperdiciar el lead. B1 fix.
+        textbox = None
+        for attempt in range(2):
+            msg_btn = await _first_visible(page, _MSG_BUTTON_SELECTORS)
+            if not msg_btn:
+                # Botón Message ausente = permanente real (privado/requiere seguir)
+                result["error"] = f"'Message' button not found on @{username} — account may be private or require follow"
+                logger.warning(f"⚠️ {result['error']}")
+                return result
 
-        await msg_btn.click()
-        await human_pause(1.5, 3)
+            await msg_btn.click()
+            await human_pause(1.5, 3)
 
-        # Confirm DM panel opened (textbox present)
-        textbox = await _first_visible(page, _TEXTBOX_SELECTORS)
+            # Wait for DM panel animation to complete before checking textbox.
+            try:
+                await page.wait_for_selector(
+                    'div[contenteditable="true"][role="textbox"]',
+                    state="visible",
+                    timeout=8_000,
+                )
+            except Exception:
+                pass
+
+            textbox = await _first_visible(page, _TEXTBOX_SELECTORS)
+            if textbox:
+                break
+
+            # Panel no abrió. Si es el 1er intento → backoff + reload + reintenta.
+            if attempt == 0:
+                logger.warning(f"⏳ Panel no abrió @{username} — backoff + retry")
+                await human_pause(25, 40)
+                try:
+                    await page.goto(profile_url, wait_until="load", timeout=45_000)
+                    await human_pause(2, 4)
+                    await page.evaluate("window.scrollBy(0, 220)")
+                    await human_pause(1.0, 2.0)
+                    await page.evaluate("window.scrollBy(0, -100)")
+                    await human_pause(0.5, 1.2)
+                except Exception:
+                    pass
+
         if not textbox:
             result["error"] = "DM panel did not open — textbox not found"
             logger.error(f"❌ {result['error']} (@{username})")
