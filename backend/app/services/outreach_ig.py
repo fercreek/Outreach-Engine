@@ -208,6 +208,22 @@ async def send_dm_instagram(page: Page, lead: Lead, message: str) -> dict:
         # ── 1. Navigate to profile ────────────────────────────
         profile_url = f"{IG_BASE}/{username}/"
         await page.goto(profile_url, wait_until="load", timeout=45_000)
+
+        # ── 1b. Dead-page check — cuenta borrada/deshabilitada ─────────────────
+        # IG muestra "Sorry, this page isn't available" cuando la cuenta ya no
+        # existe. Sin esto, el flujo cae al retry de panel y se marca TEMPORARY
+        # → se reintenta cada día para siempre. Detectarlo aquí = PERMANENT real.
+        try:
+            dead = await page.query_selector(
+                'text=/Sorry, this page isn.t available|Esta página no está disponible|p.gina no est. disponible/i'
+            )
+            if dead:
+                result["error"] = f"Account does not exist — page unavailable (@{username})"
+                logger.warning(f"⚠️ {result['error']}")
+                return result
+        except Exception:
+            pass  # En la duda, seguir el flujo normal
+
         # Wait for React to render profile buttons (Instagram SPA never reaches networkidle)
         try:
             await page.wait_for_selector(
