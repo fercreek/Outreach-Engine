@@ -28,14 +28,14 @@ Tiene: arquitectura completa, flujo de prospección, fases de implementación, e
 | Worker | `services/worker.py` | ✅ | Bugs corregidos, pausa interruptible |
 | Outreach | `services/outreach.py` | ✅ | Selectores con fallbacks resilientes |
 | Approval API | `routers/leads.py` | ✅ | `/approval-queue`, `/approve`, `/reject` |
-| Approval UI | `frontend/pages/ApprovalQueue.jsx` | ✅ | HITL con preview de mensaje |
+| Approval UI | `frontend/src/pages/ApprovalQueue.jsx` | ✅ | HITL con preview de mensaje |
 | Discovery | `services/discovery.py` | ✅ | Búsqueda `/search/user`, calificación, `POST /api/discovery/run` |
 | Monitor | `services/monitor.py` | ✅ | Inbox + unread; opcional dispara agente si hay API key |
 | Warming | `services/warming.py` | 🟡 | Básico funcional, verificar selectores |
 | Agent | `services/agent.py` | ✅ | Claude + tools; `POST /api/agent/process-reply` |
 | Notifications | `services/notifications.py` | ✅ | Escalación Twilio (opcional) + log; aviso convertido |
 | Knowledge base | `app/knowledge/*.md` | ✅ | 4 archivos Studio Link |
-| Conversations UI | `frontend/pages/Conversations.jsx` | ✅ | Historial + ejecutar agente manual |
+| Conversations UI | `frontend/src/pages/Conversations.jsx` | ✅ | Historial + ejecutar agente manual |
 
 ## Fases de implementación
 
