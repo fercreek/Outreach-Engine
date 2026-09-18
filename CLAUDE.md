@@ -119,3 +119,17 @@ El Outreach Engine es independiente de Studio Link (la app Rails). La conexión 
 - Webhook `POST /api/webhook/lead-converted` en Studio Link cuando un lead acepta
 - Studio Link crea el Customer automáticamente
 - Por ahora: notificación WhatsApp a Fernando es suficiente
+
+<!-- SKILLS:START (auto — editar en venom/registry/skills-by-project.yaml) -->
+## Skills de este proyecto
+> Auto-sync desde `venom/registry/skills-by-project.yaml` (venom = master). NO editar a mano.
+> **Regla: antes de generar/ejecutar una tarea con skill aquí, proponerlo y preguntar '¿uso [skill]?' — no improvisar.**
+
+### DEFAULT — skills propios de este repo (propón apenas la tarea aplica)
+| Tarea | Skill |
+|---|---|
+| redactar mensajes de outreach en la voz de Fernando | `fernando-voice` |
+| mensajes de WhatsApp copy-paste | `wa-message-kit` |
+
+> Skills de cualquier repo (familias venom/carnage/build y cross-proyecto): sección `## Skills de todos los repos` del CLAUDE.md global.
+<!-- SKILLS:END -->
